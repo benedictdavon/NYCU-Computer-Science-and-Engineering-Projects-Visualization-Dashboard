@@ -38,15 +38,12 @@ st.set_page_config(layout="wide")
 # ========================================== Data Loading ==========================================
 @st.cache_resource
 def load_data():
-    data = pd.read_csv("data/dengue_fever_cases_by_area.csv", dtype=str)
-    dengue_spraying = pd.read_csv("data/dengue_spray_count_by_area.csv", dtype=str)
+    data = pd.read_csv("data/dengue_fever_cases_by_area.csv")
+    dengue_spraying = pd.read_csv("data/dengue_spray_count_by_area.csv")
 
     return data, dengue_spraying
 
 data, dengue_spraying = load_data()
-data.columns = data.columns.map(str)
-dengue_spraying.columns = dengue_spraying.columns.map(str)
-
 
 # ========================================== Sidebar ==========================================
 st.sidebar.title("Taiwan City Dengue Fever Cases Filter")

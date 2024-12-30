@@ -36,10 +36,11 @@ if 'spraying_selected_specific_date' not in st.session_state:
 st.set_page_config(layout="wide")
 
 # ========================================== Data Loading ==========================================
-@st.cache_data
+@st.cache_resource
 def load_data():
-    data = pd.read_csv("data/dengue_fever_cases_by_area.csv")
-    dengue_spraying = pd.read_csv("data/dengue_spray_count_by_area.csv")
+    data = pd.read_csv("data/dengue_fever_cases_by_area.csv", dtype=str)
+    dengue_spraying = pd.read_csv("data/dengue_spray_count_by_area.csv", dtype=str)
+
     return data, dengue_spraying
 
 data, dengue_spraying = load_data()

@@ -1,7 +1,19 @@
 # NYCU-Computer-Science-and-Engineering-Projects-Visualization-Dashboard
 
-```markdown
-.\.venv\Scripts\activate
+## App Overview
+This interactive dashboard helps visualize dengue fever cases, mosquito densities, and related spraying activities. It combines mappings, charts, and timeline analyses to assist users in understanding dengue outbreaks and the effects of spraying efforts.
+
+## How to Use
+1. Clone this repository and install the required packages (listed in requirements.txt).
+2. Activate the virtual environment:  
+   ```
+   .\.venv\Scripts\activate
+   ```
+3. Run the application with:
+   ```
+   streamlit run app.py
+   ```
+4. Use the sidebar controls to filter data by date range, neighborhoods, and more.
 
 ## Packages
 - pandas
@@ -34,4 +46,3 @@
 - **'布氏級數' (breteau_grade):** This column represents the grade or classification based on the Breteau Index.
 - **'容器指數' (container_index):** This column contains the Container Index, which is the percentage of water-holding containers infested with larvae or pupae.
 - **'容器級數' (container_grade):** This column represents the grade or classification based on the Container Index.
-```

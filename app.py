@@ -244,7 +244,6 @@ def create_spraying_markers(data):
             )
             markers.append(marker)
     return markers
-
 def create_heatmap_map(data, map_type="cases", radius=25, include_spray_markers=False, spray_data=None):
     m = folium.Map(
         location=st.session_state.map_center,
@@ -253,7 +252,13 @@ def create_heatmap_map(data, map_type="cases", radius=25, include_spray_markers=
     )
 
     if map_type == "cases":
-        heat_data = data[["latitude", "longitude", "cases"]].dropna().values.tolist()
+        # Ensure data types are correct
+        heat_data = data[["latitude", "longitude", "cases"]].astype({
+            "latitude": float,
+            "longitude": float,
+            "cases": float
+        }).dropna().values.tolist()
+        
         HeatMap(
             heat_data,
             radius=radius,
@@ -262,13 +267,18 @@ def create_heatmap_map(data, map_type="cases", radius=25, include_spray_markers=
             max_opacity=0.8,
         ).add_to(m)
         
-        # Add spraying markers if requested
         if include_spray_markers and spray_data is not None:
             for marker in create_spraying_markers(spray_data):
                 marker.add_to(m)
 
     elif map_type == "spraying":
-        heat_data = data[["latitude", "longitude", "spray_count"]].dropna().values.tolist()
+        # Ensure data types are correct
+        heat_data = data[["latitude", "longitude", "spray_count"]].astype({
+            "latitude": float,
+            "longitude": float,
+            "spray_count": float
+        }).dropna().values.tolist()
+        
         HeatMap(
             heat_data,
             radius=radius,

@@ -354,9 +354,6 @@ if start_date and end_date:
             filtered_cases = filtered_cases.dropna(subset=["latitude", "longitude", "cases"])
             if not filtered_cases.empty:
                 m1 = create_heatmap_map(filtered_cases, map_type="cases", radius=radius)
-                st.write("Data columns before rendering heatmap:", data.columns.tolist())
-                st.write("Dengue spraying columns before rendering heatmap:", dengue_spraying.columns.tolist())
-
                 map1 = st_folium(m1, width=800, height=600)
                 handle_map_sync(map1, "map1")
             else:

@@ -43,6 +43,9 @@ def load_data():
     return data, dengue_spraying
 
 data, dengue_spraying = load_data()
+data.columns = data.columns.map(str)
+dengue_spraying.columns = dengue_spraying.columns.map(str)
+
 
 # ========================================== Sidebar ==========================================
 st.sidebar.title("Taiwan City Dengue Fever Cases Filter")

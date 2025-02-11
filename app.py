@@ -40,6 +40,11 @@ st.set_page_config(layout="wide")
 def load_data():
     data = pd.read_csv("data/dengue_fever_cases_by_area.csv")
     dengue_spraying = pd.read_csv("data/dengue_spray_count_by_area.csv")
+    
+    # Convert latitude and longitude to float
+    for df in [data, dengue_spraying]:
+        df['latitude'] = pd.to_numeric(df['latitude'], errors='coerce')
+        df['longitude'] = pd.to_numeric(df['longitude'], errors='coerce')
 
     return data, dengue_spraying
 
@@ -235,17 +240,23 @@ def create_spraying_markers(data):
     """Create markers for spraying locations with custom icons"""
     markers = []
     for _, row in data.iterrows():
-        if pd.notnull(row['latitude']) and pd.notnull(row['longitude']):
-            popup_text = f"Spraying Count: {row['spray_count']}<br>Date: {row['date']}"
-            icon = folium.Icon(color='blue', icon='tint', prefix='fa')
-            marker = folium.Marker(
-                location=[row['latitude'], row['longitude']],
-                popup=popup_text,
-                icon=icon
-            )
-            markers.append(marker)
+        try:
+            lat = float(row['latitude'])
+            lon = float(row['longitude'])
+            if pd.notnull(lat) and pd.notnull(lon):
+                popup_text = f"Spraying Count: {row['spray_count']}<br>Date: {row['date']}"
+                icon = folium.Icon(color='blue', icon='tint', prefix='fa')
+                marker = folium.Marker(
+                    location=[lat, lon],
+                    popup=popup_text,
+                    icon=icon
+                )
+                markers.append(marker)
+        except (ValueError, TypeError):
+            continue
     return markers
-def create_heatmap_map(data, map_type="cases", radius=25, include_spray_markers=False, spray_data=None):
+
+def create_heatmap_map(data, map_type="cases", radius=25, include_spray_markers=False, spray_data=None, is_effect_analysis=False):
     m = folium.Map(
         location=st.session_state.map_center,
         zoom_start=st.session_state.map_zoom,
@@ -253,40 +264,76 @@ def create_heatmap_map(data, map_type="cases", radius=25, include_spray_markers=
     )
 
     if map_type == "cases":
-        # Ensure data types are correct
-        heat_data = data[["latitude", "longitude", "cases"]].astype({
-            "latitude": float,
-            "longitude": float,
-            "cases": float
-        }).dropna().values.tolist()
-        
-        HeatMap(
-            heat_data,
-            radius=radius,
-            gradient={0.0: "lime", 0.4: "cyan", 0.6: "yellow", 0.8: "blue", 1.0: "red"},
-            min_opacity=0.4,
-            max_opacity=0.8,
-        ).add_to(m)
-        
-        if include_spray_markers and spray_data is not None:
-            for marker in create_spraying_markers(spray_data):
-                marker.add_to(m)
+        if spraying_date_filter_mode == "Specific Date" and is_effect_analysis:
+            # Two colors: one for first 3 days, one for next 4 days
+            first_color = '#ff0000'  # Red for first 3 days
+            second_color = '#0000ff'  # Blue for next 4 days
+            
+            dates = sorted(data["diagnosis_date"].dt.date.unique())
+            mid_point = dates[3] if len(dates) > 3 else dates[-1]
+            
+            # First 3 days
+            first_period = data[data["diagnosis_date"].dt.date < mid_point]
+            if not first_period.empty:
+                heat_data = first_period[["latitude", "longitude", "cases"]].dropna().values.tolist()
+                rgb = tuple(int(first_color.lstrip('#')[i:i+2], 16) for i in (0, 2, 4))
+                HeatMap(
+                    heat_data,
+                    radius=radius,
+                    gradient={
+                        0.4: f"rgba({rgb[0]},{rgb[1]},{rgb[2]},0.2)", 
+                        0.65: f"rgba({rgb[0]},{rgb[1]},{rgb[2]},0.5)", 
+                        0.9: f"rgba({rgb[0]},{rgb[1]},{rgb[2]},0.8)"
+                    },
+                    min_opacity=0.2,
+                    max_opacity=0.8,
+                    name="First 3 Days"
+                ).add_to(m)
+            
+            # Next 4 days
+            second_period = data[data["diagnosis_date"].dt.date >= mid_point]
+            if not second_period.empty:
+                heat_data = second_period[["latitude", "longitude", "cases"]].dropna().values.tolist()
+                rgb = tuple(int(second_color.lstrip('#')[i:i+2], 16) for i in (0, 2, 4))
+                HeatMap(
+                    heat_data,
+                    radius=radius,
+                    gradient={
+                        0.4: f"rgba({rgb[0]},{rgb[1]},{rgb[2]},0.2)", 
+                        0.65: f"rgba({rgb[0]},{rgb[1]},{rgb[2]},0.5)", 
+                        0.9: f"rgba({rgb[0]},{rgb[1]},{rgb[2]},0.8)"
+                    },
+                    min_opacity=0.2,
+                    max_opacity=0.8,
+                    name="Next 4 Days"
+                ).add_to(m)
+            
+            folium.LayerControl().add_to(m)
+        else:
+            # Single color (blue) heatmap with proper gradient for density
+            heat_data = data[["latitude", "longitude", "cases"]].dropna().values.tolist()
+            HeatMap(
+                heat_data,
+                radius=radius,
+                gradient={0.4: "rgba(0,0,255,0.2)", 0.65: "rgba(0,0,255,0.5)", 0.9: "rgba(0,0,255,0.8)"},
+                min_opacity=0.2,
+                max_opacity=0.8,
+            ).add_to(m)
 
     elif map_type == "spraying":
-        # Ensure data types are correct
-        heat_data = data[["latitude", "longitude", "spray_count"]].astype({
-            "latitude": float,
-            "longitude": float,
-            "spray_count": float
-        }).dropna().values.tolist()
-        
+        # Single color (blue) heatmap for spraying data with proper gradient
+        heat_data = data[["latitude", "longitude", "spray_count"]].dropna().values.tolist()
         HeatMap(
             heat_data,
             radius=radius,
-            gradient={0.0: "lime", 0.4: "cyan", 0.6: "yellow", 0.8: "blue", 1.0: "red"},
-            min_opacity=0.4,
+            gradient={0.4: "rgba(0,0,255,0.2)", 0.65: "rgba(0,0,255,0.5)", 0.9: "rgba(0,0,255,0.8)"},
+            min_opacity=0.2,
             max_opacity=0.8,
         ).add_to(m)
+
+    if include_spray_markers and spray_data is not None:
+        for marker in create_spraying_markers(spray_data):
+            marker.add_to(m)
 
     return m
 
@@ -446,10 +493,60 @@ if start_date and end_date:
         
         # Convert specific date to timestamp for calculations
         spray_date = pd.Timestamp(spraying_specific_date)
-        
+
         with effect_col1:
+            st.subheader("7 Days Before Spraying")
+            before_end = spray_date - pd.Timedelta(days=1)
+            before_start = before_end - pd.Timedelta(days=6)
+            
+            before_cases = data[
+                (data["diagnosis_date"] >= before_start) &
+                (data["diagnosis_date"] <= before_end)
+            ]
+            
+            if not before_cases.empty:
+                m_before = create_heatmap_map(
+                    before_cases, 
+                    map_type="cases", 
+                    radius=radius,
+                    is_effect_analysis=True,
+                    include_spray_markers=True,
+                    spray_data=filtered_spraying
+                )
+                map_before = st_folium(m_before, width=800, height=600, key="map_before")
+                handle_map_sync(map_before, "map_before")
+                
+                # Simplified legend with just two colors
+                st.markdown("---")
+                st.markdown("### Color Legend - Days Before Spraying")
+                legend_cols = st.columns(2)
+                
+                with legend_cols[0]:
+                    st.markdown(
+                        '<div style="display: flex; align-items: center; margin-bottom: 5px;">'
+                        '<div style="width: 20px; height: 20px; background-color: #ff0000; '
+                        'margin-right: 10px; border-radius: 3px;"></div>'
+                        '<div>First 3 Days</div>'
+                        '</div>',
+                        unsafe_allow_html=True
+                    )
+                
+                with legend_cols[1]:
+                    st.markdown(
+                        '<div style="display: flex; align-items: center; margin-bottom: 5px;">'
+                        '<div style="width: 20px; height: 20px; background-color: #0000ff; '
+                        'margin-right: 10px; border-radius: 3px;"></div>'
+                        '<div>Next 4 Days</div>'
+                        '</div>',
+                        unsafe_allow_html=True
+                    )
+                
+                st.info(f"Showing cases from {before_start.date()} to {before_end.date()}")
+            else:
+                st.warning("No cases data available for the period before spraying.")
+                
+        with effect_col2:
             st.subheader("7 Days After Spraying")
-            # Get cases for 7 days after spraying
             after_start = spray_date
             after_end = after_start + pd.Timedelta(days=6)
             
@@ -463,33 +560,41 @@ if start_date and end_date:
                     after_cases, 
                     map_type="cases", 
                     radius=radius,
-                    include_spray_markers=True,
-                    spray_data=filtered_spraying
+                    is_effect_analysis=True,
+                    include_spray_markers=True,  # Add this parameter
+                    spray_data=filtered_spraying  # Add this parameter
                 )
                 map_after = st_folium(m_after, width=800, height=600, key="map_after")
                 handle_map_sync(map_after, "map_after")
+                
+                # Add legend below the map
+                st.markdown("---")
+                st.markdown("### Color Legend - Days After Spraying")
+                legend_cols = st.columns(2)
+                
+                with legend_cols[0]:
+                    st.markdown(
+                        '<div style="display: flex; align-items: center; margin-bottom: 5px;">'
+                        '<div style="width: 20px; height: 20px; background-color: #ff0000; '
+                        'margin-right: 10px; border-radius: 3px;"></div>'
+                        '<div>First 3 Days</div>'
+                        '</div>',
+                        unsafe_allow_html=True
+                    )
+                
+                with legend_cols[1]:
+                    st.markdown(
+                        '<div style="display: flex; align-items: center; margin-bottom: 5px;">'
+                        '<div style="width: 20px; height: 20px; background-color: #0000ff; '
+                        'margin-right: 10px; border-radius: 3px;"></div>'
+                        '<div>Next 4 Days</div>'
+                        '</div>',
+                        unsafe_allow_html=True
+                    )
+                
                 st.info(f"Showing cases from {after_start.date()} to {after_end.date()}")
             else:
                 st.warning("No cases data available for the period after spraying.")
-
-        with effect_col2:
-            st.subheader("7 Days Before Spraying")
-            # Get cases for 7 days before spraying
-            before_end = spray_date - pd.Timedelta(days=1)
-            before_start = before_end - pd.Timedelta(days=6)
-            
-            before_cases = data[
-                (data["diagnosis_date"] >= before_start) &
-                (data["diagnosis_date"] <= before_end)
-            ]
-            
-            if not before_cases.empty:
-                m_before = create_heatmap_map(before_cases, map_type="cases", radius=radius)
-                map_before = st_folium(m_before, width=800, height=600, key="map_before")
-                handle_map_sync(map_before, "map_before")
-                st.info(f"Showing cases from {before_start.date()} to {before_end.date()}")
-            else:
-                st.warning("No cases data available for the period before spraying.")
 
         # Add statistics about the effect
         st.subheader("Effect Statistics")
